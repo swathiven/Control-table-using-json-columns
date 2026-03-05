@@ -1,0 +1,165 @@
+{
+	"name": "pl_SSMS_ADLS_SQLdb",
+	"properties": {
+		"activities": [
+			{
+				"name": "Lookup1",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "ds_ssms",
+						"type": "DatasetReference",
+						"parameters": {
+							"source_schema": {
+								"value": "@pipeline().parameters.table_schema",
+								"type": "Expression"
+							},
+							"source_table": {
+								"value": "@pipeline().parameters.table_name",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Lookup1').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Switch1",
+							"type": "Switch",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"on": {
+									"value": "@item().type",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "ssms-storage",
+										"activities": [
+											{
+												"name": "Execute Pipeline1",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"policy": {
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "pl_ssms_adls",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"source_schema": {
+															"value": "@json(item().source_object_setting).source_schema",
+															"type": "Expression"
+														},
+														"source_table": {
+															"value": "@json(item().source_object_setting).source_table",
+															"type": "Expression"
+														},
+														"sink_filename": {
+															"value": "@json(item().sink_object_setting).sink_filename",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "ssms-sink",
+										"activities": [
+											{
+												"name": "Execute Pipeline2",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"policy": {
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "pl_ssms_azure_sql_db",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"source_schema": {
+															"value": "@json(item().source_object_setting).source_schema",
+															"type": "Expression"
+														},
+														"source_table": {
+															"value": "@json(item().source_object_setting).source_table",
+															"type": "Expression"
+														},
+														"sink_schema": {
+															"value": "@json(item().sink_object_setting).sink_schema",
+															"type": "Expression"
+														},
+														"sink_table": {
+															"value": "@json(item().sink_object_setting).sink_table",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"table_schema": {
+				"type": "string",
+				"defaultValue": "dbo"
+			},
+			"table_name": {
+				"type": "string",
+				"defaultValue": "controltable1"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-03-05T10:59:48Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
